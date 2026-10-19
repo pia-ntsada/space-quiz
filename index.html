@@ -169,6 +169,16 @@
     .results:not(.hidden) .big-score { animation: rise .6s ease .3s both; }
     .results h2 { margin-bottom: 8px; }
     .results p { margin: 0 0 22px; color: var(--muted); }
+    .review { margin: 0 0 22px; text-align: left; border: 1px solid var(--border); border-radius: 12px; }
+    .review summary { padding: 14px 16px; font-weight: 700; cursor: pointer; border-radius: 12px; }
+    .review summary:hover { color: var(--accent); }
+    .review ol { margin: 0; padding: 0 16px 8px; list-style: none; }
+    .review li { padding: 14px 0; border-top: 1px solid var(--border); }
+    .review .r-q { margin: 0 0 8px; font-weight: 700; }
+    .review .r-line { margin: 2px 0; color: var(--text); }
+    .review .r-line.no { color: var(--bad); }
+    .review .r-line.ok { color: var(--good); }
+    .review .r-fact { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
     .hidden { display: none !important; }
     .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
     .confetti i {
@@ -233,6 +243,11 @@
       <h2 id="result-title" tabindex="-1"></h2>
       <div class="big-score" id="final-score"></div>
       <p id="message"></p>
+      <details class="review" id="review">
+        <summary id="review-summary"></summary>
+        <ol id="review-list"></ol>
+      </details>
+      <p id="review-perfect" class="hidden">No missed questions to review. Every answer was correct!</p>
       <button class="btn" id="restart" type="button">Play again</button>
     </section>
   </main>
@@ -257,9 +272,10 @@
       game: $("game"), results: $("results"), qcount: $("qcount"), score: $("score"),
       progress: $("progress"), question: $("question"), options: $("options"),
       feedback: $("feedback"), next: $("next"), emoji: $("emoji"), title: $("result-title"),
-      finalScore: $("final-score"), message: $("message"), restart: $("restart"), confetti: $("confetti")
+      finalScore: $("final-score"), message: $("message"), restart: $("restart"), confetti: $("confetti"),
+      review: $("review"), reviewSummary: $("review-summary"), reviewList: $("review-list"), reviewPerfect: $("review-perfect")
     };
-    let index = 0, score = 0, answered = false, order = [];
+    let index = 0, score = 0, answered = false, order = [], missed = [];
 
     function shuffle(n) {
       const a = [...Array(n).keys()];
@@ -276,8 +292,10 @@
     }
 
     function start() {
-      index = 0; score = 0;
+      index = 0; score = 0; missed = [];
       clearInterval(countTimer);
+      els.reviewList.replaceChildren();
+      els.review.open = false;
       order = shuffle(QUESTIONS.length);
       els.results.classList.add("hidden");
       els.game.classList.remove("hidden");
@@ -334,6 +352,7 @@
       } else {
         buttons[i].classList.add("wrong");
         buttons[i].querySelector(".mark").textContent = "✗";
+        missed.push({ item, picked: i });
         els.feedback.innerHTML = "<strong class='no'>Not quite.</strong> The answer is " + LETTERS[item.c] + ". ";
       }
       els.feedback.append(item.f);
@@ -365,8 +384,34 @@
       els.title.textContent = title;
       countUp(score);
       els.message.textContent = msg;
+      renderReview();
       els.title.focus({ preventScroll: true });
       if (pct >= .6) confetti();
+    }
+
+    function renderReview() {
+      const perfect = missed.length === 0;
+      els.review.classList.toggle("hidden", perfect);
+      els.reviewPerfect.classList.toggle("hidden", !perfect);
+      if (perfect) return;
+      els.reviewSummary.textContent = `Review missed questions (${missed.length})`;
+      els.reviewList.replaceChildren();
+      missed.forEach(({ item, picked }) => {
+        const li = document.createElement("li");
+        const lines = [
+          ["r-q", item.q],
+          ["r-line no", `✗ Your answer: ${LETTERS[picked]}. ${item.a[picked]}`],
+          ["r-line ok", `✓ Correct answer: ${LETTERS[item.c]}. ${item.a[item.c]}`],
+          ["r-fact", item.f]
+        ];
+        lines.forEach(([cls, text]) => {
+          const p = document.createElement("p");
+          p.className = cls;
+          p.textContent = text;
+          li.append(p);
+        });
+        els.reviewList.append(li);
+      });
     }
 
     let countTimer = null;
